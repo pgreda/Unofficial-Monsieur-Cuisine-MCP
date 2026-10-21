@@ -39,9 +39,14 @@ def _guess_image_mime(path: Path) -> str:
     return mime
 
 
-async def _upload_recipe_image(image_path: str, language: str) -> dict:
+async def _upload_recipe_image(
+    image_path: str, language: str, ai_generated: bool = False
+) -> dict:
     """Upload a local image to the recipe media service and return a reference
     to it as {"media_id": int, "landscape_ref": {...}}.
+
+    `ai_generated` marks the image as AI-generated, like the checkbox in the web
+    app's cover-photo dialog; the site then shows its own "AI" watermark.
 
     Mirrors the web app's cover-photo flow, which is a three-step handshake:
       1. Ask the media service for a signed upload URL (via the proxy-api),
@@ -102,7 +107,12 @@ async def _upload_recipe_image(image_path: str, language: str) -> dict:
     # unless a separate portrait crop was made).
     return {
         "media_id": media_id,
-        "landscape_ref": {"portraitMediaId": None, "landscapeMediaId": media_id},
+        "landscape_ref": {
+            "portraitMediaId": None,
+            "landscapeMediaId": media_id,
+            "portraitIsAiGenerated": ai_generated,
+            "landscapeIsAiGenerated": ai_generated,
+        },
     }
 
 

@@ -51,6 +51,9 @@ def _build_ingredient(ingredient: dict, order: int) -> dict:
         "unit": ingredient.get("unit", ""),
         "order": ingredient.get("order", order),
     }
+    # Shown as "optional" in the app, e.g. garnish or a binder to taste.
+    if ingredient.get("optional"):
+        api_ingredient["isOptional"] = True
     system_id = ingredient.get("system_ingredient_id")
     if system_id is not None:
         if system_id < 1:

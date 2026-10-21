@@ -329,6 +329,7 @@ async def create_recipe(
     ingredient_groups: list[dict] | None = None,
     steps: list[dict] | None = None,
     image_path: str | None = None,
+    image_ai_generated: bool | None = None,
     language: str = MC_API_DEFAULT_LANGUAGE,
 ) -> dict:
     """Create a new recipe as a DRAFT under the logged-in user's account.
@@ -371,7 +372,8 @@ async def create_recipe(
             the "name" is used verbatim (like typing a custom ingredient in the
             app without picking a suggestion), no database match required. Add
             an optional "system_ingredient_id" (a positive id from
-            search_ingredients) only to link a specific database ingredient. The
+            search_ingredients) only to link a specific database ingredient.
+            Add "optional": true to mark an ingredient as optional. The
             default group is auto-named "General Ingredients" (a group needs a
             name to publish).
         ingredient_groups: Optional named ingredient groups, each
@@ -397,6 +399,9 @@ async def create_recipe(
                 "smoothie", "turbo": time_seconds
               - "roasting", "sous_vide", "slow_cooking", "fermentation":
                 temperature_celsius, time_seconds
+              - "ramp" (speed rising step by step, e.g. for pureeing):
+                ramp_steps = [{"speed": 4, "time_seconds": 10},
+                {"speed": 5, "time_seconds": 10}, ...] (at least two)
               - "scale" (weighing): weight_grams
               - "cooking_eggs": egg_size ("small"|"medium"|"large"),
                 egg_texture ("soft"|"waxy_soft"|"hard")
@@ -411,6 +416,8 @@ async def create_recipe(
             attach as the recipe's cover image. It is uploaded to the media
             service and set as both the thumbnail and the details image. This is
             the photo a draft needs before it can be published in the web app.
+        image_ai_generated: True if the photo is AI-generated; the site then
+            marks it with its own "AI" watermark (like the web app checkbox).
         language: Recipe language/locale, e.g. "pl-PL", "en-US".
     """
     return await recipes.create_recipe(
@@ -420,7 +427,8 @@ async def create_recipe(
         prep_time_minutes=prep_time_minutes, ready_time_minutes=ready_time_minutes,
         calories=calories, protein=protein, carbohydrate=carbohydrate, fat=fat,
         ingredients=ingredients, ingredient_groups=ingredient_groups,
-        steps=steps, image_path=image_path, language=language,
+        steps=steps, image_path=image_path,
+        image_ai_generated=image_ai_generated, language=language,
     )
 
 
@@ -443,6 +451,7 @@ async def edit_recipe(
     ingredient_groups: list[dict] | None = None,
     steps: list[dict] | None = None,
     image_path: str | None = None,
+    image_ai_generated: bool | None = None,
     language: str = MC_API_DEFAULT_LANGUAGE,
 ) -> dict:
     """Edit one of the logged-in user's own recipes (the "Edit" button in the
@@ -484,6 +493,8 @@ async def edit_recipe(
         steps: New ordered steps (replaces all steps; same shape as
             create_recipe, including per-step "title"/"program"/params).
         image_path: Local JPEG/PNG/WebP to set as the new cover photo.
+        image_ai_generated: Mark the new or existing cover photo as AI-generated
+            (True) or not (False); omit to keep the current marking.
         language: Recipe language/locale, e.g. "pl-PL", "en-US".
     """
     return await recipes.edit_recipe(
@@ -493,7 +504,8 @@ async def edit_recipe(
         prep_time_minutes=prep_time_minutes, ready_time_minutes=ready_time_minutes,
         calories=calories, protein=protein, carbohydrate=carbohydrate, fat=fat,
         ingredients=ingredients, ingredient_groups=ingredient_groups,
-        steps=steps, image_path=image_path, language=language,
+        steps=steps, image_path=image_path,
+        image_ai_generated=image_ai_generated, language=language,
     )
 
 

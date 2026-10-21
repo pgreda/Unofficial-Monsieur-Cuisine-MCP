@@ -37,6 +37,10 @@ DEVICE_PROGRAMS: dict[str, dict] = {
     "puree": {"params": ["time_seconds"]},
     "smoothie": {"params": ["time_seconds"]},
     "turbo": {"params": ["time_seconds"]},
+    # Speed ramp ("Rampe"): several speed levels run one after another, each for
+    # its own time, e.g. 4->5->6->7 at 10 s each for smooth pureeing. Found in
+    # official MC Smart recipes; stored as one deviceSettings entry per level.
+    "ramp": {"params": ["ramp_steps"]},
     "cooking_eggs": {
         "params": ["egg_size", "egg_texture"],
         "egg_sizes": ["small", "medium", "large"],
@@ -100,6 +104,20 @@ def _build_step_mode(step: dict) -> dict | None:
         return None
 
     program = _normalize_program(program)
+
+    if program == "ramp":
+        ramp_steps = step.get("ramp_steps") or []
+        if len(ramp_steps) < 2:
+            raise ValueError(
+                "Device program 'ramp' needs ramp_steps with at least two "
+                "{'speed', 'time_seconds'} entries"
+            )
+        settings = [
+            {"order": order, "speed": int(level["speed"]), "time": int(level["time_seconds"]),
+             "temperature": 0}
+            for order, level in enumerate(ramp_steps)
+        ]
+        return {"type": "ramp", "modeSetting": None, "deviceSettings": settings}
 
     time_seconds = step.get("time_seconds")
     mode_setting: dict | None = None

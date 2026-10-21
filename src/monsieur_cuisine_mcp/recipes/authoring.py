@@ -104,6 +104,7 @@ async def create_recipe(
     ingredient_groups: list[dict] | None = None,
     steps: Sequence[dict | str] | None = None,
     image_path: str | None = None,
+    image_ai_generated: bool | None = None,
     language: str = MC_API_DEFAULT_LANGUAGE,
 ) -> dict:
     """Create a new user recipe as a DRAFT under the logged-in account.
@@ -119,6 +120,9 @@ async def create_recipe(
     publish_recipe (public review, or private=True for a private publish). A
     published recipe cannot be reverted to a draft; to take it down, switch it to
     private or delete it with delete_recipe.
+
+    Pass `image_ai_generated=True` with an AI-generated photo so the site marks
+    it as such (like the checkbox in the web app).
 
     Pass `image_path` (a local JPEG/PNG/WebP file) to attach a dish photo. It is
     uploaded to the recipe media service and set as both the recipe thumbnail and
@@ -185,7 +189,7 @@ async def create_recipe(
     # independent of the recipe, but this keeps the writes ordered like the app).
     image_ref = None
     if image_path:
-        media = await _upload_recipe_image(image_path, language)
+        media = await _upload_recipe_image(image_path, language, bool(image_ai_generated))
         image_ref = media["landscape_ref"]
 
     # Step 2: update the draft when there is serving detail and/or a cover photo.
@@ -263,6 +267,7 @@ async def edit_recipe(
     ingredient_groups: list[dict] | None = None,
     steps: Sequence[dict | str] | None = None,
     image_path: str | None = None,
+    image_ai_generated: bool | None = None,
     language: str = MC_API_DEFAULT_LANGUAGE,
 ) -> dict:
     """Edit one of the logged-in user's own recipes. Only the fields you pass are
@@ -282,7 +287,8 @@ async def edit_recipe(
     passing `ingredients`/`ingredient_groups` replaces all ingredient groups.
     Nutrients are the exception - only the specific values you pass
     (calories/protein/carbohydrate/fat) are overwritten, the rest stay. Pass
-    `image_path` to replace the cover photo.
+    `image_path` to replace the cover photo. `image_ai_generated` marks the
+    (new or existing) cover photo as AI-generated or not; None keeps the flag.
     """
     recipe = await _get_own_recipe(recipe_id, language, action="edited")
     payload = _recipe_to_put_payload(recipe)
@@ -300,9 +306,15 @@ async def edit_recipe(
             payload.get("nutrients"), calories, protein, carbohydrate, fat
         )
     if image_path:
-        media = await _upload_recipe_image(image_path, language)
+        media = await _upload_recipe_image(image_path, language, bool(image_ai_generated))
         payload["thumbnail"] = media["landscape_ref"]
         payload["detailsImage"] = media["landscape_ref"]
+    elif image_ai_generated is not None:
+        # Only (un)mark the existing cover photo as AI-generated.
+        for key in ("thumbnail", "detailsImage"):
+            if payload.get(key):
+                payload[key]["portraitIsAiGenerated"] = image_ai_generated
+                payload[key]["landscapeIsAiGenerated"] = image_ai_generated
 
     # Serving-level edits operate on the default (first) serving size.
     serving_changed = any(

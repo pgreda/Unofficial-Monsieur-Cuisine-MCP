@@ -83,9 +83,13 @@ def _recipe_to_put_payload(recipe: dict) -> dict:
             landscape = media.get("landscapeMedia") or {}
             portrait = media.get("portraitMedia") or {}
             if landscape.get("id") or portrait.get("id"):
+                # Carry the AI-image flags over, or a re-save would silently
+                # clear the "AI-generated" marking set in the web app.
                 payload[key] = {
                     "portraitMediaId": portrait.get("id"),
                     "landscapeMediaId": landscape.get("id"),
+                    "portraitIsAiGenerated": bool(portrait.get("isAiGenerated")),
+                    "landscapeIsAiGenerated": bool(landscape.get("isAiGenerated")),
                 }
     servings = [_serving_to_put_payload(s) for s in (recipe.get("servingSizes") or [])]
     if servings:

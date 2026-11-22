@@ -180,6 +180,23 @@ async def create_recipe(
     if category_ids:
         base["categoryIds"] = category_ids
 
+    # Build (and so validate) ingredients and steps, and upload the cover photo,
+    # BEFORE creating the draft: a bad step, ingredient or image file used to
+    # raise only after the POST, leaving an empty draft behind on the account.
+    # The media service is independent of the recipe, so the upload can go first.
+    has_serving = any(
+        v is not None
+        for v in (servings_amount, servings_unit, prep_time_minutes, ready_time_minutes)
+    ) or bool(ingredients) or bool(ingredient_groups) or bool(steps)
+    if has_serving:
+        api_groups = _build_ingredient_groups(ingredients, ingredient_groups, language)
+        api_steps = _build_api_steps(steps, language)
+
+    image_ref = None
+    if image_path:
+        media = await _upload_recipe_image(image_path, language, bool(image_ai_generated))
+        image_ref = media["landscape_ref"]
+
     # Step 1: create the draft with the basic details.
     created = await _call_proxy_api(
         "api/v3/auth/user/recipes/", method="POST", language=language,
@@ -188,28 +205,12 @@ async def create_recipe(
     recipe_id = created["data"]["recipe"]["id"]
     logger.info("Created draft recipe %s (%r)", recipe_id, title)
 
-    # If a cover photo was supplied, upload it now so we can reference it in the
-    # update payload below. Done after the draft exists (the media service is
-    # independent of the recipe, but this keeps the writes ordered like the app).
-    image_ref = None
-    if image_path:
-        media = await _upload_recipe_image(image_path, language, bool(image_ai_generated))
-        image_ref = media["landscape_ref"]
-
     # Step 2: update the draft when there is serving detail and/or a cover photo.
     # The recipe PUT is a full replace, so the update carries everything at once.
-    has_serving = any(
-        v is not None
-        for v in (servings_amount, servings_unit, prep_time_minutes, ready_time_minutes)
-    ) or bool(ingredients) or bool(ingredient_groups) or bool(steps)
-
     if has_serving or image_ref is not None:
         update_payload = {**base}
 
         if has_serving:
-            api_groups = _build_ingredient_groups(ingredients, ingredient_groups, language)
-            api_steps = _build_api_steps(steps, language)
-
             serving = {
                 "isDefault": True,
                 "amount": servings_amount if servings_amount is not None else 0,

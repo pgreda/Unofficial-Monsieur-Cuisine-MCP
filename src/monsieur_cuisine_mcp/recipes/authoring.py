@@ -160,6 +160,10 @@ async def create_recipe(
     server can create the recipe even when the gateway reports a transient error;
     retrying would create duplicates.
     """
+    # Checked before the draft is created, so a bad call leaves nothing behind.
+    if image_ai_generated and not image_path:
+        raise ValueError("image_ai_generated needs image_path - there is no photo to mark")
+
     base: dict = {
         "status": "draft",
         "source": "member",
@@ -311,6 +315,11 @@ async def edit_recipe(
         payload["detailsImage"] = media["landscape_ref"]
     elif image_ai_generated is not None:
         # Only (un)mark the existing cover photo as AI-generated.
+        if not (payload.get("thumbnail") or payload.get("detailsImage")):
+            raise ValueError(
+                f"Recipe {recipe_id} has no cover photo to mark - pass image_path "
+                "together with image_ai_generated"
+            )
         for key in ("thumbnail", "detailsImage"):
             if payload.get(key):
                 payload[key]["portraitIsAiGenerated"] = image_ai_generated

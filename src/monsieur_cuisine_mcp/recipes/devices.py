@@ -112,6 +112,11 @@ def _build_step_mode(step: dict) -> dict | None:
                 "Device program 'ramp' needs ramp_steps with at least two "
                 "{'speed', 'time_seconds'} entries"
             )
+        for level in ramp_steps:
+            if not isinstance(level, dict) or level.get("speed") is None or level.get("time_seconds") is None:
+                raise ValueError(
+                    f"Each ramp_steps entry needs 'speed' and 'time_seconds', got {level!r}"
+                )
         settings = [
             {"order": order, "speed": int(level["speed"]), "time": int(level["time_seconds"]),
              "temperature": 0}

@@ -212,6 +212,22 @@ def _has_session_cookie(cookies: list[dict]) -> bool:
     )
 
 
+async def _clear_stale_session(context) -> None:
+    """Drop Monsieur Cuisine auth cookies left over in the persistent profile.
+
+    The profile keeps the previous session, so without this the wait loop sees
+    the old (possibly about-to-expire) cookies immediately, re-saves them and
+    closes the window before the user can log in. Lidl SSO / bot-protection
+    cookies are kept on purpose - see _launch_login_browser.
+    """
+    for cookie in await context.cookies():
+        if cookie["domain"].lstrip(".").endswith(MC_DOMAIN) and cookie["name"].startswith(
+            (*MC_SESSION_COOKIE_PREFIXES, "wordpress_sec_")
+        ):
+            await context.clear_cookies(name=cookie["name"], domain=cookie["domain"])
+            logger.debug("Cleared stale session cookie %s", cookie["name"])
+
+
 async def _wait_for_session(context, page, recorder: _LoginRecorder) -> None:
     """Wait until the manual login establishes a session, or fail clearly.
 
@@ -290,6 +306,7 @@ async def login_interactive(headless: bool = False) -> None:
 
     async with async_playwright() as playwright:
         context, browser_name = await _launch_login_browser(playwright, headless)
+        await _clear_stale_session(context)
         recorder = _LoginRecorder()
         context.on("page", recorder.attach)
         page = context.pages[0] if context.pages else await context.new_page()
